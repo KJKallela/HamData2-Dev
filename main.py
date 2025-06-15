@@ -1,19 +1,20 @@
 import tkinter as tk
+from tkinter import ttk
 from tkinter import messagebox
 from PIL import Image, ImageTk
 import psycopg2
-import io
+from config import DB_SETTINGS
+import psycopg2
 
 # --- Generic window geometry saving/loading using gen_settings table ---
 
 def get_pg_connection():
-    # Adjust your connection parameters here
     return psycopg2.connect(
-        dbname="HAMData",
-        user="your_user",
-        password="your_password",
-        host="localhost",
-        port=5432
+        dbname=DB_SETTINGS["database"],
+        user=DB_SETTINGS["user"],
+        password=DB_SETTINGS["password"],
+        host=DB_SETTINGS["host"],
+        port=DB_SETTINGS["port"]
     )
 
 def load_window_geometry(name):
@@ -57,19 +58,85 @@ def load_background_image_filename():
 
 # --- Your window opening functions (replace with your actual implementations) ---
 def open_qsos_window():
-    print("Open QSOs window (stub)")
+    win = tk.Toplevel()
+    win.title("QSOs")
+    tree = ttk.Treeview(win, columns=("Callsign", "Date", "Freq", "Mode", "RST"), show="headings")
+    for col in tree["columns"]:
+        tree.heading(col, text=col)
+        tree.column(col, width=100)
+    tree.pack(fill="both", expand=True)
+
+    conn = get_pg_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT callsign, qso_date, frequency, mode, rst FROM qsos ORDER BY qso_date DESC")
+    for row in cur.fetchall():
+        tree.insert("", "end", values=row)
+    cur.close()
+    conn.close()
 
 def open_callsigns_window():
-    print("Open Callsigns window (stub)")
+    win = tk.Toplevel()
+    win.title("Callsigns")
+    tree = ttk.Treeview(win, columns=("Callsign", "Name", "Country"), show="headings")
+    for col in tree["columns"]:
+        tree.heading(col, text=col)
+        tree.column(col, width=120)
+    tree.pack(fill="both", expand=True)
+
+    conn = get_pg_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT callsign, operator_name, country FROM callsigns ORDER BY callsign")
+    for row in cur.fetchall():
+        tree.insert("", "end", values=row)
+    cur.close()
+    conn.close()
 
 def open_dxcc_window():
-    print("Open DXCC window (stub)")
+    win = tk.Toplevel()
+    win.title("DXCC")
+    tree = ttk.Treeview(win, columns=("Entity", "Prefix", "Country"), show="headings")
+    for col in tree["columns"]:
+        tree.heading(col, text=col)
+        tree.column(col, width=120)
+    tree.pack(fill="both", expand=True)
+
+    conn = get_pg_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT entity_code, prefix, country_name FROM dxcc ORDER BY entity_code")
+    for row in cur.fetchall():
+        tree.insert("", "end", values=row)
+    cur.close()
+    conn.close()
 
 def open_itu_window():
-    print("Open ITU window (stub)")
+    win = tk.Toplevel()
+    win.title("ITU Zones")
+    tree = ttk.Treeview(win, columns=("Zone", "Region", "Country"), show="headings")
+    for col in tree["columns"]:
+        tree.heading(col, text=col)
+        tree.column(col, width=120)
+    tree.pack(fill="both", expand=True)
+
+    conn = get_pg_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT zone, region, country FROM itu_codes ORDER BY zone")
+    for row in cur.fetchall():
+        tree.insert("", "end", values=row)
+    cur.close()
+    conn.close()
 
 def open_settings_window():
-    print("Open Settings window (stub)")
+    win = tk.Toplevel()
+    win.title("Settings")
+    frame = ttk.Frame(win, padding=10)
+    frame.pack(fill="both", expand=True)
+    ttk.Label(frame, text="Database Settings").grid(row=0, column=0, sticky="w", pady=5)
+
+    for idx, (key, value) in enumerate(DB_SETTINGS.items(), start=1):
+        ttk.Label(frame, text=key.capitalize()).grid(row=idx, column=0, sticky="w", pady=2)
+        ttk.Entry(frame, state="readonly", width=30,
+                  textvariable=tk.StringVar(value=str(value))).grid(row=idx, column=1, sticky="w", pady=2)
+
 
 # --- Main Application ---
 class MainWindow(tk.Tk):
