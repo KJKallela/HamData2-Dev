@@ -59,6 +59,7 @@ def load_dxcc_data(tree):
                    notes, outgoing_qsl_service, third_party_traffic, valid_start, valid_end
             FROM dxcc_codes ORDER BY entity_code
         """)
+
         rows = cursor.fetchall()
         for row in rows:
             row = list(row)
