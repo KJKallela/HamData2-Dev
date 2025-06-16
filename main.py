@@ -106,10 +106,12 @@ class MainWindow(tk.Tk):
         print("TODO: Open Callsigns window")
 
     def open_dxcc_window(self):
-        print("TODO: Open DXCC window")
+        from dxcc_window import open_dxcc_window
+        open_dxcc_window(self)
 
     def open_itu_window(self):
-        print("TODO: Open ITU window")
+        from itu_window import open_itu_window
+        open_itu_window(self)
 
     def open_settings_window(self):
         from settings_window import SettingsWindow
