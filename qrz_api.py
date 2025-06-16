@@ -5,30 +5,44 @@ import xml.etree.ElementTree as ET
 import psycopg2
 from config import DB_SETTINGS
 
+
 def get_qrz_credentials():
-    conn = psycopg2.connect(**DB_SETTINGS)
-    cur = conn.cursor()
-    cur.execute("SELECT value FROM gen_settings WHERE key = 'qrz_username'")
-    username = cur.fetchone()
-    cur.execute("SELECT value FROM gen_settings WHERE key = 'qrz_password'")
-    password = cur.fetchone()
-    cur.close()
-    conn.close()
-    if username and password:
-        return username[0], password[0]
-    raise Exception("QRZ credentials missing in gen_settings")
+    """Return (username, password) strings from gen_settings.
+
+    Raises ValueError if either credential is missing.
+    """
+    with psycopg2.connect(**DB_SETTINGS) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT value FROM gen_settings WHERE key = 'qrz_username'")
+            row_user = cur.fetchone()
+            cur.execute("SELECT value FROM gen_settings WHERE key = 'qrz_password'")
+            row_pass = cur.fetchone()
+
+    username = row_user[0].strip() if row_user and row_user[0] else None
+    password = row_pass[0].strip() if row_pass and row_pass[0] else None
+
+    if not username or not password:
+        raise ValueError("QRZ credentials not found in gen_settings (keys 'qrz_username'/'qrz_password').")
+
+    return username, password
+
 
 def qrz_login():
     username, password = get_qrz_credentials()
     url = f"https://xmldata.qrz.com/xml/current/?username={username};password={password};agent=HAMDataApp"
     response = requests.get(url)
     root = ET.fromstring(response.content)
+    # Try to capture error message anywhere in the XML
+    error_text = root.findtext('Session/Error') or root.findtext('Error') or root.findtext('.//Error')
     session = root.findtext('Session/key')
     if not session:
+        if error_text:
+            raise Exception(f'QRZ login failed: {error_text}')
+        else:
+            raise Exception('QRZ login failed: Unknown response')
         error = root.findtext('Session/Error') or "Unknown error"
         raise Exception(f"QRZ login failed: {error}")
     return session
-
 def qrz_lookup(callsign):
     session = qrz_login()
     url = f"https://xmldata.qrz.com/xml/current/?s={session};callsign={callsign}"

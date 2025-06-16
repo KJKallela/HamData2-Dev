@@ -1,3 +1,8 @@
+
+"""Detail window for a single callsign.
+
+Cleaned and auto‑formatted (4‑space indents)."""
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
@@ -6,23 +11,34 @@ import psycopg2
 from config import DB_SETTINGS
 import json
 
+from qrz_api import update_callsign_from_qrz
+
 SETTINGS_FILE = "callsign_detail_size.json"
+
 
 def load_window_size():
     try:
-        with open(SETTINGS_FILE, "r") as f:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except:
+    except Exception:
         return {"width": 600, "height": 500}
 
-def save_window_size(width, height):
-    with open(SETTINGS_FILE, "w") as f:
+
+def save_window_size(width: int, height: int) -> None:
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump({"width": width, "height": height}, f)
 
-def open_callsign_detail(callsign_str, parent_refresh_callback=None):
+
+def open_callsign_detail(callsign_str: str, parent_refresh_callback=None):
+    """Open a Toplevel window showing details for *callsign_str*.
+
+    If *parent_refresh_callback* is provided, call it when the detail window
+    closes or after a successful QRZ update so the parent list refreshes.
+    """
+    # ------------------------------------------------------------------
+    # Load row from DB --------------------------------------------------
     conn = psycopg2.connect(**DB_SETTINGS)
     cur = conn.cursor()
-
     cur.execute("SELECT * FROM callsigns WHERE callsign = %s", (callsign_str,))
     row = cur.fetchone()
     colnames = [desc[0] for desc in cur.description]
@@ -36,92 +52,112 @@ def open_callsign_detail(callsign_str, parent_refresh_callback=None):
     data = dict(zip(colnames, row))
     size = load_window_size()
 
+    # ------------------------------------------------------------------
+    # Build UI ----------------------------------------------------------
     window = tk.Toplevel()
     window.title(f"Details for {callsign_str}")
     window.geometry(f"{size['width']}x{size['height']}")
     window.minsize(400, 300)
 
+    # Save geometry on resize
     def on_resize(event):
         save_window_size(event.width, event.height)
 
     window.bind("<Configure>", on_resize)
 
+    # Top frame --------------------------------------------------------
     top_frame = ttk.Frame(window)
     top_frame.pack(fill=tk.X, padx=10, pady=10)
 
-    text_frame = ttk.Frame(window)
-    text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-
-    bottom_frame = ttk.Frame(window)
-    bottom_frame.pack(fill=tk.X, padx=10, pady=5)
-
-    # Display callsign
-    cs_label = tk.Label(top_frame, text=data['callsign'], font=("Arial", 20, "bold"), fg="blue")
+    # Callsign label
+    cs_label = tk.Label(
+        top_frame,
+        text=data['callsign'],
+        font=("Arial", 20, "bold"),
+        fg="blue"
+    )
     cs_label.grid(row=0, column=0, sticky="w")
 
-    # Display image
+    # Portrait if present
     if data.get("image") and os.path.isfile(data["image"]):
         try:
             img = Image.open(data["image"])
             img.thumbnail((120, 120))
             photo = ImageTk.PhotoImage(img)
             img_label = tk.Label(top_frame, image=photo)
-            img_label.image = photo
+            img_label.image = photo  # keep ref
             img_label.grid(row=0, column=1, rowspan=6, padx=10, sticky="ne")
-        except Exception as e:
-            print("Failed to load image:", e)
+        except Exception as exc:
+            print("Failed to load image:", exc)
 
-    # Display selected fields
+    # Selected address / name fields
     row_index = 1
     for label, field in [
         ("Name", "wholename"),
         ("Address 1", "addr1"),
         ("Address 2", "addr2"),
         ("State/ZIP", ("state", "zip")),
-        ("Country", "country")
+        ("Country", "country"),
     ]:
         value = ""
         if isinstance(field, tuple):
             value = f"{data.get(field[0], '')} {data.get(field[1], '')}".strip()
         else:
             value = data.get(field, "")
+
         if value:
             lbl = tk.Label(top_frame, text=value, font=("Arial", 14))
             lbl.grid(row=row_index, column=0, sticky="w", pady=2)
             row_index += 1
 
-    # Scrollable text field for all data
-    text_widget = tk.Text(text_frame, wrap=tk.WORD)
-    text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    # Text frame for all columns --------------------------------------
+    text_frame = ttk.Frame(window)
+    text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-    scrollbar = ttk.Scrollbar(text_frame, command=text_widget.yview)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-    text_widget.config(yscrollcommand=scrollbar.set)
+    text_widget = tk.Text(text_frame, wrap=tk.NONE, height=10)
+    text_widget.pack(fill=tk.BOTH, expand=True)
 
-    # Insert remaining fields
-    for key in colnames:
-        if key in ["callsign", "wholename", "addr1", "addr2", "state", "zip", "country", "image"]:
-            continue
-        text_widget.insert(tk.END, f"{key}: {data.get(key)}\n")
+    # Put every column key/value
+    for k, v in data.items():
+        text_widget.insert(tk.END, f"{k}: {v}\n")
     text_widget.config(state=tk.DISABLED)
 
-    # Close and QRZ buttons
+    # Bottom frame -----------------------------------------------------
+    bottom_frame = ttk.Frame(window)
+    bottom_frame.pack(fill=tk.X, padx=10, pady=5)
+
+    # Handlers ---------------------------------------------------------
     def handle_close():
         window.destroy()
         if parent_refresh_callback:
-            parent_refresh_callback(callsign_str)
+            parent_refresh_callback()
 
     def handle_qrz():
-        updated = update_callsign_from_qrz(callsign_str)
-        if updated:
-            messagebox.showinfo("QRZ Update", f"{callsign_str} updated from QRZ.com.")
-            window.destroy()
-            open_callsign_detail(callsign_str, parent_refresh_callback)
-        else:
-            messagebox.showwarning("QRZ Update", f"Failed to update {callsign_str} from QRZ.com.")
+        if not messagebox.askyesno(
+            "QRZ Lookup",
+            f"Download fresh data for {callsign_str} from QRZ.com?"
+        ):
+            return
+        try:
+            updated = update_callsign_from_qrz(callsign_str)
+            if updated:
+                messagebox.showinfo(
+                    "QRZ Update", f"{callsign_str} updated from QRZ.com."
+                )
+                window.destroy()
+                if parent_refresh_callback:
+                    parent_refresh_callback()
+                open_callsign_detail(callsign_str, parent_refresh_callback)
+            else:
+                messagebox.showwarning(
+                    "QRZ Update", f"Failed to update {callsign_str} from QRZ.com."
+                )
+        except Exception as exc:
+            messagebox.showerror("QRZ Error", str(exc))
 
+    # Buttons ----------------------------------------------------------
     qrz_btn = ttk.Button(bottom_frame, text="QRZ...", command=handle_qrz)
-    qrz_btn.pack(side=tk.LEFT)
+    qrz_btn.pack(side=tk.LEFT, padx=(0, 5))
 
     close_btn = ttk.Button(bottom_frame, text="Close", command=handle_close)
     close_btn.pack(side=tk.RIGHT)

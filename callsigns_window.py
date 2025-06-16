@@ -56,7 +56,7 @@ class CallsignsWindow(tk.Toplevel):
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=scrollbar.set)
 
-        self.tree.bind("<Double-1>", self.on_row_double_click if hasattr(self, 'on_row_double_click') else lambda e: None)
+        self.tree.bind("<Double-1>", lambda e: self.open_detail())
 
         # --- Buttons (Close etc.) ---
         btn_frame = ttk.Frame(self)
@@ -123,7 +123,7 @@ class CallsignsWindow(tk.Toplevel):
             return
         callsign = self.tree.item(selected[0])["values"][0]
         from callsigns_detail import open_callsign_detail
-        open_callsign_detail(callsign, master=self)
+        open_callsign_detail(callsign, parent_refresh_callback=self.load_callsigns)
 
     def on_close(self):
         save_window_geometry("callsigns", self.geometry())

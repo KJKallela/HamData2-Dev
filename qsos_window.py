@@ -185,8 +185,8 @@ class QsosWindow(tk.Toplevel):
         if len(row_data) >= 3:
             raw_call = row_data[2]
             try:
-                from callsign_detail import open_callsign_detail_window
-                open_callsign_detail_window(self, raw_call)
+                from callsigns_detail import open_callsign_detail
+                open_callsign_detail(raw_call)
             except Exception as e:
                 messagebox.showerror("Error", f"Error opening Callsign detail:\n{e}")
 
