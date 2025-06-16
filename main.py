@@ -1,9 +1,9 @@
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
 import psycopg2
 from config import DB_SETTINGS
-
 
 def get_pg_connection():
     return psycopg2.connect(
@@ -14,7 +14,6 @@ def get_pg_connection():
         port=DB_SETTINGS["port"]
     )
 
-
 def load_window_geometry(name):
     try:
         with get_pg_connection() as conn:
@@ -24,7 +23,6 @@ def load_window_geometry(name):
                 return row[0] if row else ""
     except Exception:
         return ""
-
 
 def save_window_geometry(name, geometry):
     try:
@@ -38,7 +36,6 @@ def save_window_geometry(name, geometry):
                 conn.commit()
     except Exception as e:
         print(f"Error saving geometry for {name}: {e}")
-
 
 class MainWindow(tk.Tk):
     def __init__(self):
@@ -100,10 +97,12 @@ class MainWindow(tk.Tk):
             self.destroy()
 
     def open_qso_window(self):
-        print("TODO: Open QSO window")
+        from qsos_window import open_qsos_window
+        open_qsos_window(self)
 
     def open_callsigns_window(self):
-        print("TODO: Open Callsigns window")
+        from callsigns_window import open_callsigns_window
+        open_callsigns_window(self)
 
     def open_dxcc_window(self):
         from dxcc_window import open_dxcc_window
@@ -117,7 +116,6 @@ class MainWindow(tk.Tk):
         from settings_window import SettingsWindow
         win = SettingsWindow(self)
         win.grab_set()
-
 
 if __name__ == "__main__":
     app = MainWindow()
