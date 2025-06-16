@@ -2,25 +2,27 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from window_prefs import load_window_geometry, save_window_geometry
 from config import get_pg_connection
+import json
 
 def open_dxcc_window(parent=None):
     window = tk.Toplevel(parent)
-    window.title("DXCC Entities")
+    window.title("DXCC Codes")
 
     geometry = load_window_geometry(window, "dxcc")
     if geometry:
         window.geometry(geometry)
     else:
-        window.geometry("900x500")
+        window.geometry("1000x500")
 
     window.protocol("WM_DELETE_WINDOW", lambda: on_close(window))
 
     frame = ttk.Frame(window)
     frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-    columns = ("entity_code", "country", "cq_zone", "itu_zone", "prefix", "valid_start", "valid_end", "notes")
-    tree = ttk.Treeview(frame, columns=columns, show="headings")
+    columns = ("entity_code", "name", "country_code", "prefix", "prefix_regex", "cq",
+               "itu", "notes", "outgoing_qsl_service", "third_party_traffic", "valid_start", "valid_end")
 
+    tree = ttk.Treeview(frame, columns=columns, show="headings")
     for col in columns:
         tree.heading(col, text=col.replace("_", " ").title())
         tree.column(col, width=120, anchor="center")
@@ -53,13 +55,12 @@ def load_dxcc_data(tree):
         conn = get_pg_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT entity_code, country, cq_zone, itu_zone, prefix, valid_start, valid_end, notes
-            FROM dxcc_entities
-            ORDER BY entity_code
+            SELECT entity_code, name, country_code, prefix, prefix_regex, cq, itu,
+                   notes, outgoing_qsl_service, third_party_traffic, valid_start, valid_end
+            FROM dxcc_codes ORDER BY entity_code
         """)
         rows = cursor.fetchall()
         for row in rows:
-            # Format dates if needed (optional)
             row = list(row)
             for i, val in enumerate(row):
                 if hasattr(val, "strftime"):
@@ -79,34 +80,33 @@ def import_dxcc_data(tree):
         return
 
     try:
-        import json
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         conn = get_pg_connection()
         cursor = conn.cursor()
-
-        # Option 1: Clear old data and insert new
-        cursor.execute("DELETE FROM dxcc_entities")
-
-        # Option 2: Or implement upsert logic here instead of delete
+        cursor.execute("DELETE FROM dxcc_codes")
 
         for item in data:
-            # Adjust keys to match your JSON structure and DB schema
             cursor.execute("""
-                INSERT INTO dxcc_entities (
-                    entity_code, country, cq_zone, itu_zone, prefix,
-                    valid_start, valid_end, notes
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO dxcc_codes (
+                    entity_code, name, country_code, prefix, prefix_regex,
+                    cq, itu, notes, outgoing_qsl_service, third_party_traffic,
+                    valid_start, valid_end
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 item.get("entityCode"),
-                item.get("country"),
+                item.get("name"),
+                item.get("countryCode"),
+                item.get("prefix"),
+                item.get("prefixRegex"),
                 item.get("cq"),
                 item.get("itu"),
-                item.get("prefix"),
+                item.get("notes"),
+                item.get("outgoingQslService"),
+                item.get("thirdPartyTraffic"),
                 item.get("validStart"),
-                item.get("validEnd"),
-                item.get("notes")
+                item.get("validEnd")
             ))
 
         conn.commit()
@@ -114,7 +114,7 @@ def import_dxcc_data(tree):
         conn.close()
 
         load_dxcc_data(tree)
-        messagebox.showinfo("Success", "DXCC Entities data imported successfully.")
+        messagebox.showinfo("Success", "DXCC codes imported successfully.")
 
     except Exception as e:
         messagebox.showerror("Import Error", f"Failed to import DXCC data:\n{e}")
