@@ -1,4 +1,6 @@
+
 import requests
+
 import xml.etree.ElementTree as ET
 import psycopg2
 from config import DB_SETTINGS
@@ -72,3 +74,9 @@ def update_callsign_in_db(callsign, data):
     conn.commit()
     cur.close()
     conn.close()
+
+
+def update_callsign_from_qrz(callsign):
+    data = qrz_lookup(callsign)
+    update_callsign_in_db(callsign, data)
+    return True

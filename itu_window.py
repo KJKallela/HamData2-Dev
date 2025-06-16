@@ -8,7 +8,7 @@ def open_itu_window(parent=None):
     window = tk.Toplevel(parent)
     window.title("ITU Codes")
 
-    geometry = load_window_geometry(window, "itu")
+    geometry = load_window_geometry("itu")
     if geometry:
         window.geometry(geometry)
     else:

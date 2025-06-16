@@ -8,7 +8,7 @@ def open_dxcc_window(parent=None):
     window = tk.Toplevel(parent)
     window.title("DXCC Codes")
 
-    geometry = load_window_geometry(window, "dxcc")
+    geometry = load_window_geometry("dxcc")
     if geometry:
         window.geometry(geometry)
     else:
